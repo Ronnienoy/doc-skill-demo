@@ -161,9 +161,23 @@
     text-align: center; font-size: 11.5px; color: var(--text-dim);
     padding-bottom: 10px; flex-shrink: 0;
   }
+  .swipe-zone {
+    position: absolute; top: 0; bottom: 0;
+    width: 30px; z-index: 8;
+    touch-action: pan-y;
+  }
+  .swipe-zone.left { left: 0; }
+  .swipe-zone.right { right: 0; }
+
   @media (max-width: 600px) {
     header, .prompt-bar, .stage { margin-left: 12px; margin-right: 12px; }
-    .nav-btn { display: none; }
+    .nav-btn {
+      width: 38px; height: 38px; font-size: 16px;
+      top: auto; bottom: 12px; transform: none;
+    }
+    .nav-prev { left: 6px; }
+    .nav-next { right: 6px; }
+    .swipe-zone { width: 26px; }
   }
 </style>
 </head>
@@ -183,13 +197,15 @@
 </div>
 
 <div class="stage" id="stage">
+  <div class="swipe-zone left"></div>
+  <div class="swipe-zone right"></div>
   <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous doc">‹</button>
   <button class="nav-btn nav-next" id="nextBtn" aria-label="Next doc">›</button>
   <div class="track" id="track"></div>
 </div>
 
 <footer id="dots"></footer>
-<div class="hint">Swipe or use ← → arrow keys to browse docs</div>
+<div class="hint">Use the arrows, ← → keys, or swipe from the edges to browse docs</div>
 
 <script>
 const DOCS = [
@@ -280,29 +296,61 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') goTo(index + 1);
 });
 
-// Swipe / drag handling (works on the stage area around the iframe;
-// iframes swallow pointer events, so side gutters + prompt bar also navigate)
-let startX = null, deltaX = 0;
-function dragStart(x) { startX = x; deltaX = 0; track.classList.add('dragging'); }
-function dragMove(x) {
+// Swipe / drag handling.
+// Iframes swallow touch events, so swiping works on the edge swipe-zones,
+// the prompt bar, and any chrome around the doc. Arrows remain on all sizes.
+let startX = null, startY = null, deltaX = 0, horizontal = null;
+
+function setFramesInert(inert) {
+  document.querySelectorAll('.doc-frame iframe').forEach(f => {
+    f.style.pointerEvents = inert ? 'none' : '';
+  });
+}
+
+function dragStart(x, y) {
+  startX = x; startY = y; deltaX = 0; horizontal = null;
+}
+function dragMove(x, y) {
   if (startX === null) return;
-  deltaX = x - startX;
+  const dx = x - startX, dy = y - startY;
+  if (horizontal === null) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // dead zone
+    horizontal = Math.abs(dx) > Math.abs(dy);
+    if (horizontal) {
+      track.classList.add('dragging');
+      setFramesInert(true); // keep tracking even over the iframe
+    }
+  }
+  if (!horizontal) return;
+  deltaX = dx;
   track.style.transform = `translateX(calc(-${index * 100}% + ${deltaX}px))`;
 }
 function dragEnd() {
   if (startX === null) return;
-  track.classList.remove('dragging');
-  const threshold = Math.min(120, stage.offsetWidth * 0.15);
-  if (deltaX < -threshold) index = Math.min(DOCS.length - 1, index + 1);
-  else if (deltaX > threshold) index = Math.max(0, index - 1);
-  startX = null; deltaX = 0;
-  render();
+  if (horizontal) {
+    track.classList.remove('dragging');
+    setFramesInert(false);
+    const threshold = Math.min(90, stage.offsetWidth * 0.12);
+    if (deltaX < -threshold) index = Math.min(DOCS.length - 1, index + 1);
+    else if (deltaX > threshold) index = Math.max(0, index - 1);
+    render();
+  }
+  startX = null; startY = null; deltaX = 0; horizontal = null;
 }
-stage.addEventListener('touchstart', e => dragStart(e.touches[0].clientX), { passive: true });
-stage.addEventListener('touchmove', e => dragMove(e.touches[0].clientX), { passive: true });
+
+stage.addEventListener('touchstart', e => dragStart(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+stage.addEventListener('touchmove', e => dragMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
 stage.addEventListener('touchend', dragEnd);
-stage.addEventListener('mousedown', e => { if (e.target.closest('.nav-btn, .open-link')) return; dragStart(e.clientX); });
-window.addEventListener('mousemove', e => dragMove(e.clientX));
+stage.addEventListener('touchcancel', dragEnd);
+
+// Prompt bar also swipes (handy big touch target on mobile)
+const promptBar = document.querySelector('.prompt-bar');
+promptBar.addEventListener('touchstart', e => dragStart(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+promptBar.addEventListener('touchmove', e => dragMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+promptBar.addEventListener('touchend', dragEnd);
+
+stage.addEventListener('mousedown', e => { if (e.target.closest('.nav-btn, .open-link')) return; dragStart(e.clientX, e.clientY); });
+window.addEventListener('mousemove', e => dragMove(e.clientX, e.clientY));
 window.addEventListener('mouseup', dragEnd);
 
 render();
