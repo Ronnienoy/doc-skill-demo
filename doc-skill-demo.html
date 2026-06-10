@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wixel Doc Skill — Demo Gallery</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a21;
+    --surface-2: #24242e;
+    --text: #f2f2f5;
+    --text-dim: #9a9aa8;
+    --accent: #8a7cff;
+    --accent-soft: rgba(138, 124, 255, 0.15);
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px 10px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.2px; }
+  header h1 span { color: var(--accent); }
+  .counter { font-size: 13px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  .prompt-bar {
+    margin: 0 22px 12px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-height: 64px;
+  }
+  .prompt-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .prompt-content .label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 3px;
+  }
+  .prompt-content .text { font-size: 14.5px; line-height: 1.45; color: var(--text); }
+
+  .stage {
+    flex: 1;
+    position: relative;
+    margin: 0 22px 14px;
+    min-height: 0;
+  }
+  .track {
+    height: 100%;
+    display: flex;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  .track.dragging { transition: none; }
+  .slide {
+    flex: 0 0 100%;
+    height: 100%;
+    padding: 0 2px;
+    display: flex;
+    flex-direction: column;
+  }
+  .doc-frame {
+    flex: 1;
+    background: #fff;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+    position: relative;
+  }
+  .doc-frame iframe {
+    width: 100%; height: 100%;
+    border: 0; display: block;
+    background: #fff;
+  }
+  .frame-placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; background: var(--surface-2);
+    color: var(--text-dim); font-size: 13px;
+  }
+  .spinner {
+    width: 26px; height: 26px;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .open-link {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(15,15,19,0.78);
+    backdrop-filter: blur(6px);
+    color: #fff; text-decoration: none;
+    font-size: 12px; font-weight: 600;
+    padding: 7px 12px; border-radius: 9px;
+    opacity: 0.85; transition: opacity 0.15s;
+    z-index: 5;
+  }
+  .open-link:hover { opacity: 1; }
+
+  .nav-btn {
+    position: absolute; top: 50%;
+    transform: translateY(-50%);
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(26,26,33,0.85);
+    backdrop-filter: blur(6px);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+    transition: background 0.15s, opacity 0.15s;
+    user-select: none;
+  }
+  .nav-btn:hover { background: var(--surface-2); }
+  .nav-btn:disabled { opacity: 0.25; cursor: default; }
+  .nav-prev { left: -8px; }
+  .nav-next { right: -8px; }
+
+  footer {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    gap: 7px; padding: 0 22px 16px;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    border: 0; cursor: pointer; padding: 0;
+    transition: all 0.2s;
+  }
+  .dot.active { background: var(--accent); width: 22px; border-radius: 4px; }
+
+  .hint {
+    text-align: center; font-size: 11.5px; color: var(--text-dim);
+    padding-bottom: 10px; flex-shrink: 0;
+  }
+  @media (max-width: 600px) {
+    header, .prompt-bar, .stage { margin-left: 12px; margin-right: 12px; }
+    .nav-btn { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Wixel <span>Doc Skill</span> — Demo Gallery</h1>
+  <div class="counter" id="counter">1 / 14</div>
+</header>
+
+<div class="prompt-bar">
+  <div class="prompt-icon">✦</div>
+  <div class="prompt-content">
+    <div class="label">Prompt</div>
+    <div class="text" id="promptText"></div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous doc">‹</button>
+  <button class="nav-btn nav-next" id="nextBtn" aria-label="Next doc">›</button>
+  <div class="track" id="track"></div>
+</div>
+
+<footer id="dots"></footer>
+<div class="hint">Swipe or use ← → arrow keys to browse docs</div>
+
+<script>
+const DOCS = [
+  { url: "https://wixronnie.wixel.com/e3a17c22-997c-474c-8f19-3f034509e5a1", prompt: "Create a recipe card doc for sourdough focaccia — ingredients, steps, baker's notes." },
+  { url: "https://wixronnie.wixel.com/e4f8d2a1-b5c3-4d7e-9a1b-3f2e1d0c9b8a", prompt: "Write a team offsite recap: what we did, three decisions made, photos, action items table." },
+  { url: "https://wixronnie.wixel.com/f8d2e4a5-b7c6-4d9e-a1b2-c3d4e5f6a7b8", prompt: "Make a one-page gift certificate doc for a spa day — recipient/from fields, value, terms in small print." },
+  { url: "https://wixronnie.wixel.com/7f66a88e-4a8f-4d9a-9e1e-f3a3c3c3c3c3", prompt: "Create a one-pager for a kids' summer coding camp." },
+  { url: "https://wixronnie.wixel.com/f2d9b4c0-a1b2-4c3d-9d4e-5f6a7b8c9d0e", prompt: "Create a one-pager for a private wealth management firm." },
+  { url: "https://wixronnie.wixel.com/e7c4a1b2-8c9d-4e5f-a6b7-c8d9e0f1a2b3", prompt: "Design a retro 70s-inspired flyer doc for a vinyl fair — warm oranges/browns, chunky type." },
+  { url: "https://wixronnie.wixel.com/e4a2c1d3-7f9a-4e2b-b6c8-d9e0f1a2b3c4", prompt: "Create a brutalist one-pager for a punk record label's demo submission call — raw, stark, aggressive type." },
+  { url: "https://wixronnie.wixel.com/c1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", prompt: "Make a pastel, soft, friendly onboarding welcome doc for a meditation app's new users." },
+  { url: "https://wixronnie.wixel.com/b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", prompt: "Create me a doc with a playful article explaining why having a pet is good for health and child development." },
+  { url: "https://wixronnie.wixel.com/f5d6c7e8-a1b2-4c3d-9e0f-1a2b3c4d5e6f", prompt: "Create a doc presenting a small-batch olive oil brand's story — origin, the grove, tasting notes, where to buy." },
+  { url: "https://wixronnie.wixel.com/a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", prompt: "Create an invoice template doc for my online shoe store called \"Steps\"." },
+  { url: "https://wixronnie.wixel.com/7648f572-9114-4114-9783-67895f32a4e1", prompt: "Create a spec sheet for a mechanical keyboard aimed at programmers — dark, technical, engineered feel. Switch types table, dimensions, a firmware section." },
+  { url: "https://wixronnie.wixel.com/b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", prompt: "Make a minimalist price list for a high-end barbershop — services, durations, prices. Luxury restraint, almost no color." },
+  { url: "https://wixronnie.wixel.com/76628876-0683-4903-b097-f046c8206d28", prompt: "Write a two-page quarterly business review." }
+];
+
+const track = document.getElementById('track');
+const dotsEl = document.getElementById('dots');
+const counter = document.getElementById('counter');
+const promptText = document.getElementById('promptText');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const stage = document.getElementById('stage');
+
+let index = 0;
+const loaded = new Set();
+
+// Build slides (iframes are injected lazily)
+DOCS.forEach((doc, i) => {
+  const slide = document.createElement('div');
+  slide.className = 'slide';
+  slide.innerHTML = `
+    <div class="doc-frame" id="frame-${i}">
+      <div class="frame-placeholder">
+        <div class="spinner"></div>
+        <div>Loading doc…</div>
+      </div>
+      <a class="open-link" href="${doc.url}" target="_blank" rel="noopener">Open ↗</a>
+    </div>`;
+  track.appendChild(slide);
+
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', `Go to doc ${i + 1}`);
+  dot.addEventListener('click', () => goTo(i));
+  dotsEl.appendChild(dot);
+});
+
+function loadFrame(i) {
+  if (i < 0 || i >= DOCS.length || loaded.has(i)) return;
+  loaded.add(i);
+  const frame = document.getElementById(`frame-${i}`);
+  const iframe = document.createElement('iframe');
+  iframe.src = DOCS[i].url;
+  iframe.loading = 'lazy';
+  iframe.title = DOCS[i].prompt;
+  iframe.addEventListener('load', () => {
+    const ph = frame.querySelector('.frame-placeholder');
+    if (ph) ph.remove();
+  });
+  frame.insertBefore(iframe, frame.firstChild);
+}
+
+function render() {
+  track.style.transform = `translateX(-${index * 100}%)`;
+  counter.textContent = `${index + 1} / ${DOCS.length}`;
+  promptText.textContent = DOCS[index].prompt;
+  prevBtn.disabled = index === 0;
+  nextBtn.disabled = index === DOCS.length - 1;
+  [...dotsEl.children].forEach((d, i) => d.classList.toggle('active', i === index));
+  loadFrame(index);
+  loadFrame(index + 1);
+  loadFrame(index - 1);
+}
+
+function goTo(i) {
+  index = Math.max(0, Math.min(DOCS.length - 1, i));
+  render();
+}
+
+prevBtn.addEventListener('click', () => goTo(index - 1));
+nextBtn.addEventListener('click', () => goTo(index + 1));
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') goTo(index - 1);
+  if (e.key === 'ArrowRight') goTo(index + 1);
+});
+
+// Swipe / drag handling (works on the stage area around the iframe;
+// iframes swallow pointer events, so side gutters + prompt bar also navigate)
+let startX = null, deltaX = 0;
+function dragStart(x) { startX = x; deltaX = 0; track.classList.add('dragging'); }
+function dragMove(x) {
+  if (startX === null) return;
+  deltaX = x - startX;
+  track.style.transform = `translateX(calc(-${index * 100}% + ${deltaX}px))`;
+}
+function dragEnd() {
+  if (startX === null) return;
+  track.classList.remove('dragging');
+  const threshold = Math.min(120, stage.offsetWidth * 0.15);
+  if (deltaX < -threshold) index = Math.min(DOCS.length - 1, index + 1);
+  else if (deltaX > threshold) index = Math.max(0, index - 1);
+  startX = null; deltaX = 0;
+  render();
+}
+stage.addEventListener('touchstart', e => dragStart(e.touches[0].clientX), { passive: true });
+stage.addEventListener('touchmove', e => dragMove(e.touches[0].clientX), { passive: true });
+stage.addEventListener('touchend', dragEnd);
+stage.addEventListener('mousedown', e => { if (e.target.closest('.nav-btn, .open-link')) return; dragStart(e.clientX); });
+window.addEventListener('mousemove', e => dragMove(e.clientX));
+window.addEventListener('mouseup', dragEnd);
+
+render();
+</script>
+</body>
+</html>
